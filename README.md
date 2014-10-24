@@ -188,6 +188,8 @@ There is no support for a read group *set* but they are simpler object having on
 
 This code could easily be modified to run on top of Apache Spark and Hadoop. Instead of writing to a local filesystem, the GA repo data would be held on HDFS. The conversion, CRC and digest calculations would be done in parallel as a Spark job.
 
+Storing the data on HDFS also means that we can sync the records between sites using the Hadoop `distcp` ("distributed copy") utilty which is similar to rsync.
+
 ## Code Walk-Through
 
 All the source code is in the [src/main/scala/org/ga4gh/readstore](https://github.com/massie/gastore/tree/master/src/main/scala/org/ga4gh/readstore) directory.
