@@ -202,6 +202,83 @@ This code could easily be modified to run on top of Apache Spark and Hadoop. Ins
 
 Storing the data on HDFS also means that we can sync the records between sites using the Hadoop `distcp` ("distributed copy") utilty which is similar to rsync.
 
+## Global Alliance/Parquet files vs. compressed BAM files
+
+The Global Alliance `GAReadAlignment` is analogous to a `SAMRecord` object. This application fetches `SAMRecords` from the input BAM file, convert it to a `GAReadAlignment` and then stores it in a column-oriented Parquet file.
+
+The Global Alliance/Parquet format is 20-25% smaller than a compressed BAM file using lossless compression techniques.
+
+For example, `NA21144.chrom11.ILLUMINA.bwa.GIH.low_coverage.20130415.bam` is 1GB in size but only take 790M when stored in Parquet, e.g.
+
+```
+$ rm -rf ga_repo
+$ java -jar /workspace/berkeley/gafile/target/gastore-0.1-SNAPSHOT.jar --input NA21144.chrom11.ILLUMINA.bwa.GIH.low_coverage.20130415.bam --ga_readstore_dir ga_repo
+$ ls -lh NA21144.chrom11.ILLUMINA.bwa.GIH.low_coverage.20130415.bam
+-rw-r--r--@ 1 matt  staff   1.0G Oct 28 15:08 NA21144.chrom11.ILLUMINA.bwa.GIH.low_coverage.20130415.bam
+$ du -sh ga_repo/
+790M    ga_repo/
+```
+
+Note that Parquet was configured with a 1MB page size and GZIP compression.
+
+Parquet has utilities for analyzing column storage, e.g.
+
+```
+$ java -cp gastore-0.1-SNAPSHOT.jar parquet.hadoop.PrintFooter ga_repo//readGroups/81/53C6BC115EF22CFEFEDC0AD472D96101659542/reads
+```
+
+Here is the raw data output from `PrintFooter` (with all columns that take <1% of the total space removed)...
+
+```
+[fragmentName] BINARY 4.5% of all space [PLAIN, BIT_PACKED, PLAIN_DICTIONARY] min: 7.08M max: 11.738M average: 9.409M total: 18.818M (raw data: 108.706M saving 82%)
+  values: min: 1.888M max: 3.134M average: 2.511M total: 5.023M
+  uncompressed: min: 40.768M max: 67.938M average: 54.353M total: 108.706M
+  column values statistics: min: ERR251691.10000031, max: ERR251691.999990, num_nulls: 0
+[alignment, position, position] INT64 2.0% of all space [PLAIN, RLE, BIT_PACKED] min: 3.139M max: 5.212M average: 4.176M total: 8.352M (raw data: 40.113M saving 79%)
+  values: min: 1.888M max: 3.134M average: 2.511M total: 5.023M
+  uncompressed: min: 15.084M max: 25.029M average: 20.056M total: 40.113M
+  column values statistics: min: 85630224, max: 134945932, num_nulls: 7745
+[alignedSequence] BINARY 17.2% of all space [PLAIN, RLE, BIT_PACKED, PLAIN_DICTIONARY] min: 26.464M max: 44.057M average: 35.26M total: 70.521M (raw data: 522.553M saving 86%)
+  values: min: 1.888M max: 3.134M average: 2.511M total: 5.023M
+  uncompressed: min: 196.486M max: 326.067M average: 261.276M total: 522.553M
+  column values statistics: min: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGG, max: TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATAATAAAATAAAATTTCAAAAGGGGGGC, num_nulls: 0
+[alignedQuality, array] INT32 71.4% of all space [RLE, PLAIN_DICTIONARY] min: 108.794M max: 183.665M average: 146.229M total: 292.459M (raw data: 392.484M saving 25%)
+  values: min: 188.885M max: 313.454M average: 251.169M total: 502.339M
+  uncompressed: min: 147.893M max: 244.591M average: 196.242M total: 392.484M
+  column values statistics: min: 1, max: 50, num_nulls: 0
+[nextMatePosition, position] INT64 2.4% of all space [PLAIN, RLE, BIT_PACKED] min: 3.759M max: 6.245M average: 5.002M total: 10.005M (raw data: 39.92M saving 74%)
+  values: min: 1.888M max: 3.134M average: 2.511M total: 5.023M
+  uncompressed: min: 15.013M max: 24.907M average: 19.96M total: 39.92M
+  column values statistics: min: 956, max: 248418743, num_nulls: 17683
+number of blocks: 2
+total data size: 409.295M (raw 1.122G)
+total record: 5.023M
+average block size: 204.647M (raw 561.079M)
+average record count: 2.511M
+```
+
+Observations:
+
+* The most expensive column is `alignedQuality` which takes 71.4% of all space and compresses 25% from 392M to 292M.
+* The next most expensive is `alignedSequence` which takes 17.2% of all space and compresses 86% from 522M to 70M.
+* The `fragmentName` (`QNAME`) takes 4.5% of all space and compresses 82% from 108M to 18M.
+
+Experiment:
+
+If we change `alignedQuality` from `Array[Integer]` to a `String` of ASCII scores, we get better compression because Parquet is able to do bit packing. This drops the Parquet file size from 790M to 750M, e.g.
+
+```
+[alignedQuality, array] BINARY 69.9% of all space [PLAIN, RLE, BIT_PACKED] min: 90.264M max: 181.08M average: 135.672M total: 271.345M (raw data: 522.553M saving 48%)
+  values: min: 1.671M max: 3.352M average: 2.511M total: 5.023M
+  uncompressed: min: 173.832M max: 348.72M average: 261.276M total: 522.553M
+  column values statistics: min: "GFAH<GA?@'DE;?;BCKIKIKIJIIJGIIGFJFHJGHF@HIFHJHIIHGDFJIIED>IIJJHEFEAIFGAGE<E;FE@AC@FDFHFGBCDF@DDEBC@, max:                                     IJHJIGKHKIIGJKKJIFLKJJJIJHHKHHJIMIKIJKKKHJMHJKLKFGHJIIJJBHIHIIJEGBEIIHIIIIIDHHHHHIFFHEGGHFFFGEDFDBE<, num_nulls: 0
+```
+
+Future Work: Delta-encoding the quality scores will likely result in disk-space savings.
+
+
+
+
 ## Code Walk-Through
 
 All the source code is in the [src/main/scala/org/ga4gh/readstore](https://github.com/massie/gastore/tree/master/src/main/scala/org/ga4gh/readstore) directory.
