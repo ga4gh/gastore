@@ -1,5 +1,6 @@
 package org.ga4gh.readstore
 
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.zip.CRC32
 
@@ -11,6 +12,10 @@ class CRCAccumulator {
     if (s != null) {
       update(s.toString.getBytes(StandardCharsets.UTF_8))
     }
+  }
+
+  def update(l: Long): Unit = {
+    update(ByteBuffer.allocate(8).putLong(l).array())
   }
 
   def update(b: Array[Byte]): Unit = {

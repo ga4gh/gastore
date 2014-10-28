@@ -27,6 +27,7 @@ class ReadGroupStore(dir: File, samReadGroup: SAMReadGroupRecord, num: Int) {
   // Instantiate CRC Accumulators
   val seqCRCAccumulator = new CRCAccumulator
   val qualCRCAccumulator = new CRCAccumulator
+  val alignmentCRCAccumulator = new CRCAccumulator
   // Create a Parquet file to hold all the reads for this read store
   val reads: AvroParquetWriter[GAReadAlignment] =
     Helpers.newParquetWriter(new File(dir, "reads").toString, GAReadAlignment.SCHEMA$)
@@ -41,6 +42,9 @@ class ReadGroupStore(dir: File, samReadGroup: SAMReadGroupRecord, num: Int) {
     seqCRCAccumulator.update(gaReadAlignment.getAlignedSequence)
     if (gaReadAlignment.getAlignedQuality != null) {
       qualCRCAccumulator.update(gaReadAlignment.getAlignedQuality.toList)
+    }
+    if (gaReadAlignment.getAlignment != null && gaReadAlignment.getAlignment.getPosition != null) {
+      alignmentCRCAccumulator.update(gaReadAlignment.getAlignment.getPosition.getPosition)
     }
   }
 
@@ -81,6 +85,8 @@ class ReadGroupStore(dir: File, samReadGroup: SAMReadGroupRecord, num: Int) {
     md.update(ByteBuffer.allocate(8).putLong(seqCRCAccumulator.value))
     // (6) Quality Score CRC
     md.update(ByteBuffer.allocate(8).putLong(qualCRCAccumulator.value))
+    // (7) Alignment position CRC
+    md.update(ByteBuffer.allocate(8).putLong(alignmentCRCAccumulator.value))
 
     // Return a hex-formatted string
     md.digest().map("%02X" format _).mkString
