@@ -39,6 +39,7 @@ This program defines a digest for a `GAReadGroup` using the following algorithm:
   * the header fields of the RG (name, description, creation date, sample id)
   * the `CRCAccumulator()` of all the arrays of sequence data in the RG
   * the `CRCAccumulator()` of all the arrays of quality data in the RG
+  * the `CRCAccumulator()` of all alignment positions in the RG
 * a `CRCAccumulator()` is a 32-bit checksum for a set of arrays
   * it's built by XOR'ing together the CRC32 for each of the arrays.
   * it's sensitive to the order of objects in each array, but not to the order in which it processes the arrays
