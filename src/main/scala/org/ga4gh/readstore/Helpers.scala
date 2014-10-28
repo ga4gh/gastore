@@ -20,7 +20,7 @@ object Helpers {
 
   def newParquetWriter[T <: IndexedRecord: ClassTag](path: String, schema: Schema,
                                                      blockSize: Int = 256 * 1024 * 1024,
-                                                     pageSize: Int = 64 * 1024,
+                                                     pageSize: Int = 1024 * 1024,
                                                      enableDictionary: Boolean = true): AvroParquetWriter[T] = {
     new AvroParquetWriter[T](new Path(path), schema,
       CompressionCodecName.GZIP, blockSize, pageSize, enableDictionary)
