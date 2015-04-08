@@ -5,10 +5,10 @@ Global Alliance Read Store Example
 
 ## Getting the self-executing jar file
 
-You can just [download the latest jar file](https://github.com/massie/gastore/releases) and skip to the section on how to run, if you like; otherwise, here are the steps to building from source yourself.
+You can just [download the latest jar file](https://github.com/ga4gh/gastore/releases) and skip to the section on how to run, if you like; otherwise, here are the steps to building from source yourself.
 
 1. Install [Apache Maven](http://maven.apache.org), if you haven't already.
-2. Clone this repo: `git clone https://github.com/massie/gastore.git`
+2. Clone this repo: `git clone https://github.com/ga4gh/gastore.git`
 3. Change into the repo directory: `cd gastore`
 4. Compile, run the tests and build the uber jar file by running `mvn package`
 5. Run the program and check that you can see the help: `java -jar target/gastore-0.1-SNAPSHOT.jar --help`
@@ -281,7 +281,7 @@ Future Work: Delta-encoding the quality scores will likely result in disk-space 
 
 ## Code Walk-Through
 
-All the source code is in the [src/main/scala/org/ga4gh/readstore](https://github.com/massie/gastore/tree/master/src/main/scala/org/ga4gh/readstore) directory.
+All the source code is in the [src/main/scala/org/ga4gh/readstore](https://github.com/ga4gh/gastore/tree/master/src/main/scala/org/ga4gh/readstore) directory.
 
 * `Main.scala` is the main entry point to the program. It processes the command-line arguments and calls `addBamFile` on the `GAReadStore`
 * `GAReadStore` is passed the `rootDirPath` for the GA repo. If the `staging` and `readGroups` directories don't exist, it creates them. The `addBamFile` method uses `htsjdk` to read a SAM/BAM file, stage the data in the `staging` area and then "commit" it to the repo.
